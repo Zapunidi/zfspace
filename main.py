@@ -59,12 +59,29 @@ class ZfsBridge:
             raise ValueError('There is no dataset {} in the system.\n'
                              'The following datasets were found by "zfs list" command: {}'
                              ''.format(dataset_name, self.zfs_datasets))
+
         used_matrix = [[0 for _ in range(len(snapshot_list))] for _ in range(len(snapshot_list))]
         for end, end_name in enumerate(snapshot_list):
             for start, start_name in enumerate(snapshot_list):
                 if start <= end:
                     used_matrix[end - start][start] = \
                         int(self._get_snapshot_range_space(dataset_name, start_name, end_name))
+        # The occupied space we have in the matrix shows how much space will be freed if we delete the combination
+        # While this might be useful to make a decision, this does not show used space hierarchy
+        # Let's calculate the space occupied by snapshots combination and not by its subsets
+
+        # Now define a helper function for triange substraction
+        def substract_children(matrix, startx, starty):
+            for i in range(startx):
+                for j in range(starty, starty + startx - i + 1):
+                    matrix[startx][starty] -=  matrix[i][j]
+        # Then row by row we substract space occupied by subsets
+        # This is the correct way
+        for i in range(1, len(snapshot_list)):
+            for j, _ in enumerate(snapshot_list):
+                if j < len(snapshot_list) - i:
+                    substract_children(used_matrix, i ,j)
+        # Now we can get the whole snapshots occupied space by summing every matrix cell
         return used_matrix
 
 
@@ -122,7 +139,6 @@ class SnapshotSpace:
 
     def _print_line(self, sizes):
         max_split = len(self.snapshot_names)
-        print()
         start, end = self._split_terminal_line(len(sizes),
                                                int((max_split - len(sizes)) * self.term_columns / max_split / 2))
         print(' ' * (start[0] - 1) + '|', end='')  # shifting for padding
