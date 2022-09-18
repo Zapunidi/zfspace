@@ -14,6 +14,11 @@ import os
 import sys
 
 
+term_format = dict(PURPLE='\033[95m', CYAN='\033[96m', DARKCYAN='\033[36m', BLUE='\033[94m',
+                       GREEN='\033[92m', YELLOW='\033[93m', RED='\033[91m', BOLD='\033[1m',
+                       UNDERLINE='\033[4m', END='\033[0m')
+
+
 class ZfsBridge:
     def __init__(self):
         # Check and store existing ZFS datasets to be able to explain the user his input errors
@@ -64,11 +69,6 @@ class ZfsBridge:
 
 
 class SnapshotSpace:
-    sizes_test = {100, 917020001, 2950810867664, 1417432010192, 63699569296, 31936161312, 180680896, 180680897}
-    term_format = dict(PURPLE='\033[95m', CYAN='\033[96m', DARKCYAN='\033[36m', BLUE='\033[94m',
-                       GREEN='\033[92m', YELLOW='\033[93m', RED='\033[91m', BOLD='\033[1m',
-                       UNDERLINE='\033[4m', END='\033[0m')
-
     def __init__(self, dataset_name):
         self.term_columns, self.term_lines = os.get_terminal_size()
         self.zb = ZfsBridge()
@@ -149,8 +149,7 @@ def main(dataset_name):
     ss = SnapshotSpace(dataset_name)
 
     # Printing user intro
-    print('Analyzing {} ZFS dataset.'.format(dataset_name))
-    # print(self.term_format['BOLD'] + 'Hello World !' + self.term_format['END'])
+    print('Analyzing ' + term_format['BOLD'] + dataset_name + term_format['END'] + ' ZFS dataset.')
     ss.print_used()
 
 
