@@ -16,10 +16,22 @@ import sys
 
 class ZfsBridge:
     def __init__(self):
-        pass
+        # Check and store existing ZFS datasets to be able to explain the user his input errors
+        stream = os.popen('zfs list')
+        output = stream.read().split('\n')[1:-1]  # Take all strings of ZFS listing except first and last one
+        self.zfs_datasets = list()
+        for str in output:
+            self.zfs_datasets.append(str.split(' ')[0])
 
     def get_snapshots(self, dataset_name):
-        pass
+        if dataset_name not in self.zfs_datasets:
+            raise ValueError('There is no dataset {} in the system.\n'
+                             'There are only {} datasets found by "zfs list" command.'
+                             ''.format(dataset_name, self.zfs_datasets))
+        command = 'zfs list -r -t snapshot -s creation -o name {}'.format(dataset_name)
+        stream = os.popen(command)
+        output = stream.read().split('\n')
+        print(output)
 
 
 class SnapshotSpace:
@@ -81,14 +93,17 @@ class SnapshotSpace:
         print(self.term_format['BOLD'] + 'Hello World !' + self.term_format['END'])
 
 
-def main():
+def main(dataset_name):
     ss = SnapshotSpace()
     ss.test()
     ss.print_used()
 
+    zb = ZfsBridge()
+    zb.get_snapshots(dataset_name)
+
 
 if __name__ == '__main__':
     if len(sys.argv) == 2:
-        main()
+        main(sys.argv[1])
     else:
         sys.exit("Usage: {} <datasetname>".format(sys.argv[0]))
