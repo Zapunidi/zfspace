@@ -60,7 +60,6 @@ class ZfsBridge:
                 if start <= end:
                     used_matrix[end - start][start] = \
                         int(self._get_snapshot_range_space(dataset_name, start_name, end_name))
-        print(used_matrix)
         return used_matrix
 
 
@@ -105,6 +104,7 @@ class SnapshotSpace:
     def print_used(self):
         for i in reversed(range(1, len(self.snapshot_names))):
             self._print_line(self.snapshot_size_matrix[i][:-i])
+        self._print_line(self.snapshot_size_matrix[0])  # Last line falls out of general rule
         self._print_names()
 
     def _split_terminal_line(self, slices, padding=0):
@@ -121,7 +121,10 @@ class SnapshotSpace:
         return start_pos, end_pos
 
     def _print_line(self, sizes):
-        start, end = self._split_terminal_line(len(sizes))
+        max_split = len(self.snapshot_names)
+        print()
+        start, end = self._split_terminal_line(len(sizes),
+                                               int((max_split - len(sizes)) * self.term_columns / max_split / 2))
         print(' ' * (start[0] - 1) + '|', end='')  # shifting for padding
         for i, size in enumerate(sizes):
             self._print_in_line(self._size2human(size), end[i] - start[i])
@@ -140,9 +143,6 @@ class SnapshotSpace:
         len_format = '{:^' + '{:d}'.format(str_length) + 's}'  # Prepare format string with desired width
         print(len_format.format(string), end='')
 
-    def test(self):
-        print(self.term_format['BOLD'] + 'Hello World !' + self.term_format['END'])
-
 
 def main(dataset_name):
     # Preparing classes
@@ -150,7 +150,7 @@ def main(dataset_name):
 
     # Printing user intro
     print('Analyzing {} ZFS dataset.'.format(dataset_name))
-    ss.test()
+    # print(self.term_format['BOLD'] + 'Hello World !' + self.term_format['END'])
     ss.print_used()
 
 
