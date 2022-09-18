@@ -43,9 +43,9 @@ class ZfsBridge:
         output = stream.read().split('\n')[1:-1]  # Take all strings of ZFS snapshot listing except first and last one
         return list(map(self.strip_filesystem_name, output))
 
-    def _get_snapshot_range_space(self, dataset, first_snap, last_snap):
+    @ staticmethod
+    def _get_snapshot_range_space(dataset, first_snap, last_snap):
         command = 'zfs destroy -nvp {}@{}%{}'.format(dataset, first_snap, last_snap)
-        # print(command)
         stream = os.popen(command)
         return stream.read().split('\n')[-2].split('\t')[-1]  # Take the second part of the last line
 
@@ -54,14 +54,12 @@ class ZfsBridge:
             raise ValueError('There is no dataset {} in the system.\n'
                              'The following datasets were found by "zfs list" command: {}'
                              ''.format(dataset_name, self.zfs_datasets))
-        used_matrix = [[0 for i in range(len(snapshot_list))] for j in range(len(snapshot_list))]
+        used_matrix = [[0 for _ in range(len(snapshot_list))] for _ in range(len(snapshot_list))]
         for end, end_name in enumerate(snapshot_list):
             for start, start_name in enumerate(snapshot_list):
                 if start <= end:
-                    # print('Invoking start={}, end={} with start_name={} and end_name={}'
-                    #      .format(start, end, start_name, end_name))
-                    used_matrix[end - start][start] = self._get_snapshot_range_space(dataset_name, start_name, end_name)
-                    # print(used_matrix[end - start][start])
+                    used_matrix[end - start][start] = \
+                        int(self._get_snapshot_range_space(dataset_name, start_name, end_name))
         print(used_matrix)
         return used_matrix
 
@@ -105,10 +103,11 @@ class SnapshotSpace:
             raise ValueError('Did not expect snapshot size to exceed 1000 pebibytes')
 
     def print_used(self):
-        self._print_line(self.sizes_test)
+        for i in reversed(range(1, len(self.snapshot_names))):
+            self._print_line(self.snapshot_size_matrix[i][:-i])
         self._print_names()
 
-    def _split_terminal_line(self, slices, padding = 0):
+    def _split_terminal_line(self, slices, padding=0):
         # Calculate fractional space for strings considering (slices + 1) separators and padding
         start_pos = list()
         end_pos = list()
