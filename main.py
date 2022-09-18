@@ -20,8 +20,8 @@ class ZfsBridge:
         stream = os.popen('zfs list')
         output = stream.read().split('\n')[1:-1]  # Take all strings of ZFS listing except first and last one
         self.zfs_datasets = list()
-        for str in output:
-            self.zfs_datasets.append(str.split(' ')[0])
+        for string in output:
+            self.zfs_datasets.append(string.split(' ')[0])
 
     @staticmethod
     def strip_filesystem_name(snapshot_name):
@@ -30,10 +30,10 @@ class ZfsBridge:
         We require (and check) that the snapshot name contains a single
         '@' separating filesystem name from the 'snapshot' part of the name.
         """
-        assert snapshot_name.count("@") == 1
-        return snapshot_name.split("@")[1]
+        assert snapshot_name.count('@') == 1
+        return snapshot_name.split('@')[1]
 
-    def get_snapshots(self, dataset_name):
+    def get_snapshot_names(self, dataset_name):
         if dataset_name not in self.zfs_datasets:
             raise ValueError('There is no dataset {} in the system.\n'
                              'The following datasets were found by "zfs list" command: {}'
@@ -43,6 +43,28 @@ class ZfsBridge:
         output = stream.read().split('\n')[1:-1]  # Take all strings of ZFS snapshot listing except first and last one
         return list(map(self.strip_filesystem_name, output))
 
+    def _get_snapshot_range_space(self, dataset, first_snap, last_snap):
+        command = 'zfs destroy -nvp {}@{}%{}'.format(dataset, first_snap, last_snap)
+        # print(command)
+        stream = os.popen(command)
+        return stream.read().split('\n')[-2].split('\t')[-1]  # Take the second part of the last line
+
+    def get_snapshots_space(self, dataset_name, snapshot_list):
+        if dataset_name not in self.zfs_datasets:
+            raise ValueError('There is no dataset {} in the system.\n'
+                             'The following datasets were found by "zfs list" command: {}'
+                             ''.format(dataset_name, self.zfs_datasets))
+        used_matrix = [[0 for i in range(len(snapshot_list))] for j in range(len(snapshot_list))]
+        for end, end_name in enumerate(snapshot_list):
+            for start, start_name in enumerate(snapshot_list):
+                if start <= end:
+                    # print('Invoking start={}, end={} with start_name={} and end_name={}'
+                    #      .format(start, end, start_name, end_name))
+                    used_matrix[end - start][start] = self._get_snapshot_range_space(dataset_name, start_name, end_name)
+                    # print(used_matrix[end - start][start])
+        print(used_matrix)
+        return used_matrix
+
 
 class SnapshotSpace:
     sizes_test = {100, 917020001, 2950810867664, 1417432010192, 63699569296, 31936161312, 180680896, 180680897}
@@ -50,8 +72,11 @@ class SnapshotSpace:
                        GREEN='\033[92m', YELLOW='\033[93m', RED='\033[91m', BOLD='\033[1m',
                        UNDERLINE='\033[4m', END='\033[0m')
 
-    def __init__(self):
+    def __init__(self, dataset_name):
         self.term_columns, self.term_lines = os.get_terminal_size()
+        self.zb = ZfsBridge()
+        self.snapshot_names = self.zb.get_snapshot_names(dataset_name)
+        self.snapshot_size_matrix = self.zb.get_snapshots_space(dataset_name, self.snapshot_names)
 
     @staticmethod
     def _size2human(size):
@@ -81,22 +106,40 @@ class SnapshotSpace:
 
     def print_used(self):
         self._print_line(self.sizes_test)
+        self._print_names()
+
+    def _split_terminal_line(self, slices, padding = 0):
+        # Calculate fractional space for strings considering (slices + 1) separators and padding
+        start_pos = list()
+        end_pos = list()
+        frac_size = (self.term_columns - slices - 1 - padding * 2) / slices  # possibly non integer length
+        pos = 1 + padding
+        for _ in range(slices):
+            start_pos.append(int(pos))
+            pos += frac_size
+            end_pos.append(int(pos))
+            pos += 1  # space for separator
+        return start_pos, end_pos
 
     def _print_line(self, sizes):
-        # Calculate fractional space for strings including len + 1 separators
-        frac_size = (self.term_columns - len(sizes) - 1) / len(sizes)  # possibly non integer length
-        pos = 0
-        for size in sizes:
-            pos += frac_size
-            length = int(pos)
+        start, end = self._split_terminal_line(len(sizes))
+        print(' ' * (start[0] - 1) + '|', end='')  # shifting for padding
+        for i, size in enumerate(sizes):
+            self._print_in_line(self._size2human(size), end[i] - start[i])
             print('|', end='')
-            self._print_used(size, length)
-            pos -= length
+        print('')  # New line afterwards
+
+    def _print_names(self):
+        start, end = self._split_terminal_line(len(self.snapshot_names))
+        for i, name in enumerate(self.snapshot_names):
+            print('|', end='')
+            self._print_in_line(name, end[i] - start[i])
         print('|')  # New line afterwards
 
-    def _print_used(self, used, str_length):
+    @staticmethod
+    def _print_in_line(string, str_length):
         len_format = '{:^' + '{:d}'.format(str_length) + 's}'  # Prepare format string with desired width
-        print(len_format.format(self._size2human(used)), end='')
+        print(len_format.format(string), end='')
 
     def test(self):
         print(self.term_format['BOLD'] + 'Hello World !' + self.term_format['END'])
@@ -104,11 +147,7 @@ class SnapshotSpace:
 
 def main(dataset_name):
     # Preparing classes
-    ss = SnapshotSpace()
-    zb = ZfsBridge()
-
-    # Initializing with user input
-    snapshot_list = zb.get_snapshots(dataset_name)
+    ss = SnapshotSpace(dataset_name)
 
     # Printing user intro
     print('Analyzing {} ZFS dataset.'.format(dataset_name))
