@@ -23,15 +23,25 @@ class ZfsBridge:
         for str in output:
             self.zfs_datasets.append(str.split(' ')[0])
 
+    @staticmethod
+    def strip_filesystem_name(snapshot_name):
+        """Given the name of a snapshot, strip the filesystem part.
+
+        We require (and check) that the snapshot name contains a single
+        '@' separating filesystem name from the 'snapshot' part of the name.
+        """
+        assert snapshot_name.count("@") == 1
+        return snapshot_name.split("@")[1]
+
     def get_snapshots(self, dataset_name):
         if dataset_name not in self.zfs_datasets:
             raise ValueError('There is no dataset {} in the system.\n'
-                             'There are only {} datasets found by "zfs list" command.'
+                             'The following datasets were found by "zfs list" command: {}'
                              ''.format(dataset_name, self.zfs_datasets))
         command = 'zfs list -r -t snapshot -s creation -o name {}'.format(dataset_name)
         stream = os.popen(command)
-        output = stream.read().split('\n')
-        print(output)
+        output = stream.read().split('\n')[1:-1]  # Take all strings of ZFS snapshot listing except first and last one
+        return list(map(self.strip_filesystem_name, output))
 
 
 class SnapshotSpace:
@@ -89,17 +99,21 @@ class SnapshotSpace:
         print(len_format.format(self._size2human(used)), end='')
 
     def test(self):
-        print('columns = {}, lines = {}'.format(self.term_columns, self.term_lines))
         print(self.term_format['BOLD'] + 'Hello World !' + self.term_format['END'])
 
 
 def main(dataset_name):
+    # Preparing classes
     ss = SnapshotSpace()
+    zb = ZfsBridge()
+
+    # Initializing with user input
+    snapshot_list = zb.get_snapshots(dataset_name)
+
+    # Printing user intro
+    print('Analyzing {} ZFS dataset.'.format(dataset_name))
     ss.test()
     ss.print_used()
-
-    zb = ZfsBridge()
-    zb.get_snapshots(dataset_name)
 
 
 if __name__ == '__main__':
