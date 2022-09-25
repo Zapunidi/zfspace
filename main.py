@@ -54,9 +54,9 @@ class ZfsBridge:
             raise ValueError('There is no dataset {} in the system.\n'
                              'The following datasets were found by "zfs list" command: {}'
                              ''.format(dataset_name, self.zfs_datasets))
-        command = 'zfs list -r -t snapshot -s creation -o name {}'.format(dataset_name)
+        command = 'zfs list -H -d 1 -t snapshot -s creation -o name {}'.format(dataset_name)
         stream = os.popen(command)
-        output = stream.read().split('\n')[1:-1]  # Take all strings of ZFS snapshot listing except first and last one
+        output = stream.read().split('\n')[:-1]  # Take all strings of ZFS snapshot listing except last one
         return list(map(self.strip_filesystem_name, output))
 
     @ staticmethod
