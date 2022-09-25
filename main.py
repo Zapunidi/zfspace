@@ -20,6 +20,16 @@ term_format = dict(PURPLE='\033[95m', CYAN='\033[96m', DARKCYAN='\033[36m', BLUE
                    UNDERLINE='\033[4m', END='\033[0m')
 
 
+def size2human(size_bytes):
+    if size_bytes == 0:
+        return "0 B"
+    size_name = ("B", "kiB", "MiB", "GiB", "TiB", "PiB", "EiB", "ZiB", "YiB")
+    i = int(math.floor(math.log(size_bytes, 1024)))
+    p = math.pow(1024, i)
+    s = round(size_bytes / p, 2)
+    return '{:.4} {}'.format(s, size_name[i])
+
+
 class ZfsBridge:
     def __init__(self):
         # Check and store existing ZFS datasets to be able to explain the user his input errors
@@ -92,8 +102,8 @@ class ZfsBridge:
                              ''.format(dataset_name, self.zfs_datasets))
         command = 'zfs list -p -o space {}'.format(dataset_name)
         stream = os.popen(command)
-        print(stream.read().split('\n')[-2].split(' '))
-        # return stream.read().split('\n')[-2].split('\t')[-1]  # Take the second part of the last line
+        data = list(filter(None, stream.read().split('\n')[-2].split(' ')))  # Get second string and split it by spaces
+        print(data)
 
 
 class SnapshotSpace:
@@ -102,17 +112,6 @@ class SnapshotSpace:
         self.zb = ZfsBridge()
         self.snapshot_names = self.zb.get_snapshot_names(dataset_name)
         self.snapshot_size_matrix = self.zb.get_snapshots_space(dataset_name, self.snapshot_names)
-
-    @staticmethod
-    def _size2human(size_bytes):
-        if size_bytes == 0:
-            return "0 B"
-        size_name = ("B", "kiB", "MiB", "GiB", "TiB", "PiB", "EiB", "ZiB", "YiB")
-        i = int(math.floor(math.log(size_bytes, 1024)))
-        p = math.pow(1024, i)
-        s = round(size_bytes / p, 2)
-        return '{:.4} {}'.format(s, size_name[i])
-
 
     def print_used(self):
         for i in reversed(range(1, len(self.snapshot_names))):
@@ -139,7 +138,7 @@ class SnapshotSpace:
                                                int((max_split - len(sizes)) * self.term_columns / max_split / 2))
         print(' ' * (start[0] - 1) + '|', end='')  # shifting for padding
         for i, size in enumerate(sizes):
-            self._print_in_line(self._size2human(size), end[i] - start[i])
+            self._print_in_line(size2human(size), end[i] - start[i])
             print('|', end='')
         print('')  # New line afterwards
 
