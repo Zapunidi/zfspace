@@ -1,0 +1,10 @@
+[project]
+name = "zfspace"
+description = "zfspace tool helps to analyze how zfs disk space is used"
+version = "0.1.0"
+authors = [
+    { name = "Sergey Zapunidi", email = "zapunidy@gmail.com" }
+]
+
+[project.scripts]
+zfspace = "zfspace:main"
