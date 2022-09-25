@@ -12,11 +12,12 @@ explanatory for inexperienced users.
 
 import os
 import sys
+import math
 
 
 term_format = dict(PURPLE='\033[95m', CYAN='\033[96m', DARKCYAN='\033[36m', BLUE='\033[94m',
-                       GREEN='\033[92m', YELLOW='\033[93m', RED='\033[91m', BOLD='\033[1m',
-                       UNDERLINE='\033[4m', END='\033[0m')
+                   GREEN='\033[92m', YELLOW='\033[93m', RED='\033[91m', BOLD='\033[1m',
+                   UNDERLINE='\033[4m', END='\033[0m')
 
 
 class ZfsBridge:
@@ -72,17 +73,27 @@ class ZfsBridge:
 
         # Now define a helper function for triange substraction
         def substract_children(matrix, startx, starty):
-            for i in range(startx):
-                for j in range(starty, starty + startx - i + 1):
-                    matrix[startx][starty] -=  matrix[i][j]
+            for x in range(startx):
+                for y in range(starty, starty + startx - x + 1):
+                    matrix[startx][starty] -= matrix[x][y]
         # Then row by row we substract space occupied by subsets
         # This is the correct way
         for i in range(1, len(snapshot_list)):
             for j, _ in enumerate(snapshot_list):
                 if j < len(snapshot_list) - i:
-                    substract_children(used_matrix, i ,j)
+                    substract_children(used_matrix, i, j)
         # Now we can get the whole snapshots occupied space by summing every matrix cell
         return used_matrix
+
+    def get_dataset_summary(self, dataset_name):
+        if dataset_name not in self.zfs_datasets:
+            raise ValueError('There is no dataset {} in the system.\n'
+                             'The following datasets were found by "zfs list" command: {}'
+                             ''.format(dataset_name, self.zfs_datasets))
+        command = 'zfs list -p -o space {}'.format(dataset_name)
+        stream = os.popen(command)
+        print(stream.read().split('\n')[-2].split(' '))
+        # return stream.read().split('\n')[-2].split('\t')[-1]  # Take the second part of the last line
 
 
 class SnapshotSpace:
@@ -93,30 +104,15 @@ class SnapshotSpace:
         self.snapshot_size_matrix = self.zb.get_snapshots_space(dataset_name, self.snapshot_names)
 
     @staticmethod
-    def _size2human(size):
-        size_format = '{:.4}'
+    def _size2human(size_bytes):
+        if size_bytes == 0:
+            return "0 B"
+        size_name = ("B", "kiB", "MiB", "GiB", "TiB", "PiB", "EiB", "ZiB", "YiB")
+        i = int(math.floor(math.log(size_bytes, 1024)))
+        p = math.pow(1024, i)
+        s = round(size_bytes / p, 2)
+        return '{:.4} {}'.format(s, size_name[i])
 
-        if size < 0:
-            raise ValueError('Snapshot size cannot be negative')
-        if size < 1000:
-            return ('{:5d}' + ' B').format(size)
-        size /= 1024  # convert to kibibytes
-        if size < 1000:
-            return (size_format + ' KiB').format(size)
-        size /= 1024  # convert to mebibytes
-        if size < 1000:
-            return (size_format + ' MiB').format(size)
-        size /= 1024  # convert to gibibytes
-        if size < 1000:
-            return (size_format + ' GiB').format(size)
-        size /= 1024  # convert to tebibytes
-        if size < 1000:
-            return (size_format + ' TiB').format(size)
-        size /= 1024  # convert to pebibytes
-        if size < 1000:
-            return (size_format + ' PiB').format(size)
-        else:
-            raise ValueError('Did not expect snapshot size to exceed 1000 pebibytes')
 
     def print_used(self):
         for i in reversed(range(1, len(self.snapshot_names))):
@@ -163,9 +159,11 @@ class SnapshotSpace:
 def main(dataset_name):
     # Preparing classes
     ss = SnapshotSpace(dataset_name)
+    zb = ZfsBridge()
 
     # Printing user intro
     print('Analyzing ' + term_format['BOLD'] + dataset_name + term_format['END'] + ' ZFS dataset.')
+    zb.get_dataset_summary(dataset_name)
     ss.print_used()
 
 
