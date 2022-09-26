@@ -155,7 +155,11 @@ class SnapshotSpace:
         print(len_format.format(string), end='')
 
 
-def main(dataset_name):
+def main():
+    if len(sys.argv) != 2:
+        sys.exit("Usage: {} <datasetname>".format(sys.argv[0]))
+    dataset_name = sys.argv[1]
+
     # Preparing classes
     ss = SnapshotSpace(dataset_name)
     zb = ZfsBridge()
@@ -164,10 +168,3 @@ def main(dataset_name):
     print('Analyzing ' + term_format['BOLD'] + dataset_name + term_format['END'] + ' ZFS dataset.')
     zb.get_dataset_summary(dataset_name)
     ss.print_used()
-
-
-if __name__ == '__main__':
-    if len(sys.argv) == 2:
-        main(sys.argv[1])
-    else:
-        sys.exit("Usage: {} <datasetname>".format(sys.argv[0]))
