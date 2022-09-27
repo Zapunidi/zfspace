@@ -2,14 +2,14 @@
 name = "zfspace"
 description = "zfspace tool helps to analyze how zfs disk space is used"
 readme = "README.md"
-version = "0.1.3"
+version = "0.1.4"
 authors = [
     { name = "Sergey Zapunidi", email = "zapunidy@gmail.com" }
 ]
 requires-python = ">=3.4"
 classifiers = [
     "Programming Language :: Python :: 3",
-    "License :: OSI Approved :: CC0 License",
+    "License :: CC0 1.0 Universal (CC0 1.0) Public Domain Dedication",
     "Operating System :: OS Independent",
 ]
 
