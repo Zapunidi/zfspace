@@ -2,7 +2,7 @@
 name = "zfspace"
 description = "zfspace tool helps to analyze how zfs disk space is used"
 readme = "README.md"
-version = "0.1.5"
+version = "0.1.6"
 authors = [
     { name = "Sergey Zapunidi", email = "zapunidy@gmail.com" }
 ]
