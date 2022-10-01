@@ -1,7 +1,6 @@
 language: python
 cache: pip
 python:
-- '3.6'
 - '3.8'
 install: pip3 install build
 script: python3 -m build --wheel
