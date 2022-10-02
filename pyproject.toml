@@ -8,9 +8,12 @@ authors = [
 ]
 requires-python = ">=3.4"
 classifiers = [
+    "Topic :: System :: Filesystems",
     "Programming Language :: Python :: 3",
     "License :: CC0 1.0 Universal (CC0 1.0) Public Domain Dedication",
     "Operating System :: OS Independent",
+    "Environment :: Console",
+    "Intended Audience :: System Administrators",
 ]
 
 [build-system]
