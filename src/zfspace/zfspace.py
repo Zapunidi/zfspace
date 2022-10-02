@@ -21,7 +21,14 @@ term_format = dict(PURPLE='\033[95m', CYAN='\033[96m', DARKCYAN='\033[36m', BLUE
                    UNDERLINE='\033[4m', END='\033[0m')
 
 
-def size2human(size_bytes):
+def size2human(size_bytes: int):
+    """Convert size in bytes into human readable format like MiB or GiB.
+    Sizes up to YiB (>10^24) are supported. The result is rounded to 2-4 meaningful digits.
+
+    :param int size_bytes: The bytes number that needs to be put into human readable form
+    :return: Short string representing size (14.1 GiB for example)
+    :rtype: str
+    """
     if size_bytes == 0:
         return "0 B"
     size_name = ("B", "kiB", "MiB", "GiB", "TiB", "PiB", "EiB", "ZiB", "YiB")
@@ -32,20 +39,29 @@ def size2human(size_bytes):
 
 
 class ZfsBridge:
+    zfs_path = '/sbin/zfs'
+
     def __init__(self):
-        # Check and store existing ZFS datasets to be able to explain the user his input errors
-        stream = os.popen('zfs list')
+        # Check whether zfs is present in the system
+        if not os.path.isfile('/sbin/zfs'):
+            raise FileNotFoundError(
+                '{} is not found on your computer. Is ZFS-on-Linux installed?'.format(self.zfs_path))
+        # Check and store existing ZFS datasets to be able to explain the user's input errors
+        stream = os.popen('{} list'.format(self.zfs_path))
         output = stream.read().split('\n')[1:-1]  # Take all strings of ZFS listing except first and last one
         self.zfs_datasets = list()
         for string in output:
             self.zfs_datasets.append(string.split(' ')[0])
 
     @staticmethod
-    def strip_filesystem_name(snapshot_name):
+    def strip_filesystem_name(snapshot_name: str):
         """Given the name of a snapshot, strip the filesystem part.
 
         We require (and check) that the snapshot name contains a single
         '@' separating filesystem name from the 'snapshot' part of the name.
+        :param str snapshot_name: A standard single snapshot name with trailing filesystem and @ symbol
+        :return: The name of the snapshot that goes after @ symbol
+        :rtype: str
         """
         assert snapshot_name.count('@') == 1
         return snapshot_name.split('@')[1]
@@ -61,14 +77,13 @@ class ZfsBridge:
 
     def get_snapshot_names(self, dataset_name):
         self._check_dataset_name(dataset_name)
-        command = 'zfs list -H -d 1 -t snapshot -s creation -o name {}'.format(dataset_name)
+        command = '{} list -H -d 1 -t snapshot -s creation -o name {}'.format(self.zfs_path, dataset_name)
         stream = os.popen(command)
         output = stream.read().split('\n')[:-1]  # Take all strings of ZFS snapshot listing except last one
         return list(map(self.strip_filesystem_name, output))
 
-    @ staticmethod
-    def _get_snapshot_range_space(dataset, first_snap, last_snap):
-        command = 'zfs destroy -nvp {}@{}%{}'.format(dataset, first_snap, last_snap)
+    def _get_snapshot_range_space(self, dataset, first_snap, last_snap):
+        command = '{} destroy -nvp {}@{}%{}'.format(self.zfs_path, dataset, first_snap, last_snap)
         stream = os.popen(command)
         return stream.read().split('\n')[-2].split('\t')[-1]  # Take the second part of the last line
 
@@ -100,7 +115,7 @@ class ZfsBridge:
 
     def get_dataset_summary(self, dataset_name):
         self._check_dataset_name(dataset_name)
-        command = 'zfs list -p -o space {}'.format(dataset_name)
+        command = '{} list -p -o space {}'.format(self.zfs_path, dataset_name)
         stream = os.popen(command)
         data = list(filter(None, stream.read().split('\n')[-2].split(' ')))  # Get second string and split it by spaces
         print(data)
