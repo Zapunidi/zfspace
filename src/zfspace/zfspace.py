@@ -52,10 +52,12 @@ class ZfsBridge:
 
     def _check_dataset_name(self, dataset_name):
         if dataset_name not in self.zfs_datasets:
-            candidate_name = difflib.get_close_matches(dataset_name, self.zfs_datasets, n=1)[0]
-            raise ValueError('There is no dataset "{}" in the system.\n'
-                             'Did you mean using "{}" instead?'
-                             ''.format(dataset_name, candidate_name))
+            candidate_list = difflib.get_close_matches(dataset_name, self.zfs_datasets, n=1)
+            if len(candidate_list) == 1:
+                suggest_str = '\nDid you mean using "{}" instead?'.format(candidate_list[0])
+            else:
+                suggest_str = ''
+            raise ValueError('There is no dataset "{}" in the system.{}'.format(dataset_name, suggest_str))
 
     def get_snapshot_names(self, dataset_name):
         self._check_dataset_name(dataset_name)
