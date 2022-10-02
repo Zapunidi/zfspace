@@ -159,6 +159,8 @@ def main():
     dataset_name = sys.argv[1]
 
     # Preparing classes
+    ss = None  # Fix warnings about possible usage before initialization
+    zb = None  # Fix warnings about possible usage before initialization
     try:
         ss = SnapshotSpace(dataset_name)
         zb = ZfsBridge()
