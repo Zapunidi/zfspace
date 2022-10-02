@@ -1,7 +1,7 @@
 #!/usr/bin/env python3
-""" Usage: zfspace <pool or dataset name>
+""" Usage: zfspace <dataset name>
 
-Tool to analyze missing disk space by ZFS
+Console tool to find occupied pool space in ZFS on Linux.
 
 The main purpose is to visualize missing space that is hidden in snapshots.
 ZFS only shows space occupied by a snapshot's unique data and doesn't
@@ -13,6 +13,7 @@ explanatory for inexperienced users.
 import os
 import sys
 import math
+import difflib
 
 
 term_format = dict(PURPLE='\033[95m', CYAN='\033[96m', DARKCYAN='\033[36m', BLUE='\033[94m',
@@ -49,11 +50,15 @@ class ZfsBridge:
         assert snapshot_name.count('@') == 1
         return snapshot_name.split('@')[1]
 
-    def get_snapshot_names(self, dataset_name):
+    def _check_dataset_name(self, dataset_name):
         if dataset_name not in self.zfs_datasets:
-            raise ValueError('There is no dataset {} in the system.\n'
-                             'The following datasets were found by "zfs list" command: {}'
-                             ''.format(dataset_name, self.zfs_datasets))
+            candidate_name = difflib.get_close_matches(dataset_name, self.zfs_datasets, n=1)[0]
+            raise ValueError('There is no dataset "{}" in the system.\n'
+                             'Did you mean using "{}" instead?'
+                             ''.format(dataset_name, candidate_name))
+
+    def get_snapshot_names(self, dataset_name):
+        self._check_dataset_name(dataset_name)
         command = 'zfs list -H -d 1 -t snapshot -s creation -o name {}'.format(dataset_name)
         stream = os.popen(command)
         output = stream.read().split('\n')[:-1]  # Take all strings of ZFS snapshot listing except last one
@@ -66,11 +71,7 @@ class ZfsBridge:
         return stream.read().split('\n')[-2].split('\t')[-1]  # Take the second part of the last line
 
     def get_snapshots_space(self, dataset_name, snapshot_list):
-        if dataset_name not in self.zfs_datasets:
-            raise ValueError('There is no dataset {} in the system.\n'
-                             'The following datasets were found by "zfs list" command: {}'
-                             ''.format(dataset_name, self.zfs_datasets))
-
+        self._check_dataset_name(dataset_name)
         used_matrix = [[0 for _ in range(len(snapshot_list))] for _ in range(len(snapshot_list))]
         for end, end_name in enumerate(snapshot_list):
             for start, start_name in enumerate(snapshot_list):
@@ -96,10 +97,7 @@ class ZfsBridge:
         return used_matrix
 
     def get_dataset_summary(self, dataset_name):
-        if dataset_name not in self.zfs_datasets:
-            raise ValueError('There is no dataset {} in the system.\n'
-                             'The following datasets were found by "zfs list" command: {}'
-                             ''.format(dataset_name, self.zfs_datasets))
+        self._check_dataset_name(dataset_name)
         command = 'zfs list -p -o space {}'.format(dataset_name)
         stream = os.popen(command)
         data = list(filter(None, stream.read().split('\n')[-2].split(' ')))  # Get second string and split it by spaces
@@ -161,8 +159,12 @@ def main():
     dataset_name = sys.argv[1]
 
     # Preparing classes
-    ss = SnapshotSpace(dataset_name)
-    zb = ZfsBridge()
+    try:
+        ss = SnapshotSpace(dataset_name)
+        zb = ZfsBridge()
+    except Exception as err:
+        print(err)
+        exit()
 
     # Printing user intro
     print('Analyzing ' + term_format['BOLD'] + dataset_name + term_format['END'] + ' ZFS dataset.')
