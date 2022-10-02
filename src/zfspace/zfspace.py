@@ -18,7 +18,7 @@ import difflib
 
 term_format = dict(PURPLE='\033[95m', CYAN='\033[96m', DARKCYAN='\033[36m', BLUE='\033[94m',
                    GREEN='\033[92m', YELLOW='\033[93m', RED='\033[91m', BOLD='\033[1m',
-                   UNDERLINE='\033[4m', END='\033[0m')
+                   UNDERLINE='\033[4m', WHITEBOLD='\033[1;37m', END='\033[0m')
 
 
 def size2human(size_bytes: int):
@@ -36,6 +36,65 @@ def size2human(size_bytes: int):
     p = math.pow(1024, i)
     s = round(size_bytes / p, 2)
     return '{:.4} {}'.format(s, size_name[i])
+
+
+def split_terminal_line(term_columns, slices=0, fractions_list=list(), padding=0):
+    # Convert slices into fractions_list
+    if len(fractions_list) == 0:
+        if slices is 0:
+            raise TypeError('At least one parameter must be set. '
+                            'Either slices > 0 or fractions_list must be a not empty list.')
+        else:
+            fractions_list = [1/slices] * slices
+    else:
+        slices = len(fractions_list)
+
+    # Normalize fractions_list
+    fractions_list = [float(i) / sum(fractions_list) for i in fractions_list]
+
+    # Calculate fractional space for strings considering (slices + 1) separators and padding
+    start_pos = list()
+    end_pos = list()
+    writable_columns = (term_columns - slices - 1 - padding * 2)
+    pos = 1 + padding
+    for frac in fractions_list:
+        start_pos.append(int(pos))
+        pos += writable_columns * frac
+        end_pos.append(int(pos))
+        pos += 1  # space for separator
+    return start_pos, end_pos
+
+
+def print_in_line(string, str_length):
+    """Prints centered output, considering that console cursor is in the beginning of the span to print.
+    Prints . or nothing if there is not enough space to print wrole string
+
+    :param string: String to print
+    :param int str_length: Integer number of symbols to fill with string
+    :return: None
+    """
+    if len(string) > str_length:
+        string = '.' * str_length
+    if str_length == 0:
+        return
+    len_format = '{:^' + '{:d}'.format(str_length) + 's}'  # Prepare format string with desired width
+    print(len_format.format(string), end='')
+
+
+class DivBar:
+    """
+    An object to draw console visual representations of different parts of a whole
+    """
+    def __init__(self):
+        self.term_columns, self.term_lines = os.get_terminal_size()
+
+    def print_dict(self, names_list):
+        names, sizes = zip(*names_list)
+        start, end = split_terminal_line(self.term_columns, fractions_list=sizes)
+        for i, name in enumerate(names):
+            print('|', end='')
+            print_in_line(name + ' ' + size2human(sizes[i]), end[i] - start[i])
+        print('|')  # New line afterwards
 
 
 class ZfsBridge:
@@ -117,8 +176,13 @@ class ZfsBridge:
         self._check_dataset_name(dataset_name)
         command = '{} list -p -o space {}'.format(self.zfs_path, dataset_name)
         stream = os.popen(command)
-        data = list(filter(None, stream.read().split('\n')[-2].split(' ')))  # Get second string and split it by spaces
-        print(data)
+        string_list = stream.read().split('\n')[0:2]  # Get names and data strings
+        # Split it by spaces and remove empty strings. Also drop name, Available and USED starting fields.
+        data = list(filter(None, string_list[1].split(' ')))[3:]
+        names = list(filter(None, string_list[0].split(' ')))[3:]
+        data = list(map(int, data))  # Convert to integers
+        dv = DivBar()
+        dv.print_dict(list(zip(names, data)))
 
 
 class SnapshotSpace:
@@ -134,40 +198,22 @@ class SnapshotSpace:
         self._print_line(self.snapshot_size_matrix[0])  # Last line falls out of general rule
         self._print_names()
 
-    def _split_terminal_line(self, slices, padding=0):
-        # Calculate fractional space for strings considering (slices + 1) separators and padding
-        start_pos = list()
-        end_pos = list()
-        frac_size = (self.term_columns - slices - 1 - padding * 2) / slices  # possibly non integer length
-        pos = 1 + padding
-        for _ in range(slices):
-            start_pos.append(int(pos))
-            pos += frac_size
-            end_pos.append(int(pos))
-            pos += 1  # space for separator
-        return start_pos, end_pos
-
     def _print_line(self, sizes):
         max_split = len(self.snapshot_names)
-        start, end = self._split_terminal_line(len(sizes),
-                                               int((max_split - len(sizes)) * self.term_columns / max_split / 2))
+        start, end = split_terminal_line(self.term_columns, slices=len(sizes),
+                                         padding=int((max_split - len(sizes)) * self.term_columns / max_split / 2))
         print(' ' * (start[0] - 1) + '|', end='')  # shifting for padding
         for i, size in enumerate(sizes):
-            self._print_in_line(size2human(size), end[i] - start[i])
+            print_in_line(size2human(size), end[i] - start[i])
             print('|', end='')
         print('')  # New line afterwards
 
     def _print_names(self):
-        start, end = self._split_terminal_line(len(self.snapshot_names))
+        start, end = split_terminal_line(self.term_columns, slices=len(self.snapshot_names))
         for i, name in enumerate(self.snapshot_names):
             print('|', end='')
-            self._print_in_line(name, end[i] - start[i])
+            print_in_line(name, end[i] - start[i])
         print('|')  # New line afterwards
-
-    @staticmethod
-    def _print_in_line(string, str_length):
-        len_format = '{:^' + '{:d}'.format(str_length) + 's}'  # Prepare format string with desired width
-        print(len_format.format(string), end='')
 
 
 def main():
@@ -186,6 +232,6 @@ def main():
         exit()
 
     # Printing user intro
-    print('Analyzing ' + term_format['BOLD'] + dataset_name + term_format['END'] + ' ZFS dataset.')
+    print('Analyzing ' + term_format['WHITEBOLD'] + dataset_name + term_format['END'] + ' ZFS dataset.')
     zb.get_dataset_summary(dataset_name)
     ss.print_used()
