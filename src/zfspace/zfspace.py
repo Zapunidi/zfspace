@@ -186,10 +186,15 @@ class ZfsBridge:
 
 
 class SnapshotSpace:
+    zfs_max_snapshots = 30
+
     def __init__(self, dataset_name):
         self.term_columns, self.term_lines = os.get_terminal_size()
         self.zb = ZfsBridge()
         self.snapshot_names = self.zb.get_snapshot_names(dataset_name)
+        if len(self.snapshot_names) >= self.zfs_max_snapshots:
+            raise ValueError('You have more than {} snapshots in {}. It is too many to show in console.'
+                             .format(len(self.snapshot_names), dataset_name))
         self.snapshot_size_matrix = self.zb.get_snapshots_space(dataset_name, self.snapshot_names)
 
     def print_used(self):
