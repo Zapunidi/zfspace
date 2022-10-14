@@ -14,6 +14,7 @@ import os
 import sys
 import math
 import difflib
+import argparse
 
 
 term_format = dict(PURPLE='\033[95m', CYAN='\033[96m', DARKCYAN='\033[36m', BLUE='\033[94m',
@@ -260,6 +261,8 @@ class SnapshotSpace:
 
 
 def deep_analysis(zb: ZfsBridge, dataset_name, name, size):
+    global filter_level
+
     def hello_helper(section_name, size_bytes, text):
         print(term_format['WHITEBOLD'] + section_name + term_format['END'] + ' occupy ' + term_format['CYAN'] +
               size2human(size_bytes) + term_format['END'] + '. ' + text)
@@ -285,22 +288,44 @@ def deep_analysis(zb: ZfsBridge, dataset_name, name, size):
         hello_helper('Children ZFS filesystems', size, 'The following children may be considered to be cleaned:')
         dv = DivBar()
         used_all_children = zb.get_dataset_summary(dataset_name)[6][1]
+        part_count = 0
         for child in zb.get_children_summary(dataset_name):
+            part_count += child[2][1] / used_all_children  # Normalized sum
             print(term_format['BOLD'] + str(child[0][1]) + term_format['END'] +
                   term_format['CYAN'] + ' {}'.format(size2human(child[2][1]) + term_format['END'] + ' of ' +
                   term_format['CYAN'] + '{}'.format(size2human(used_all_children)) + term_format['END'] +
                   ' ({:.3}%). '.format(round(100 * child[2][1] / used_all_children, 1)) +
                   'Run "zfspace {}" to make a more detailed analysis:'.format(child[0][1])))
             dv.print_dict(child[3:])
+            if part_count >= filter_level:
+                break
 
     else:
         raise ValueError('Unknown ZFS {} space user: {}'.format(dataset_name, name))
 
 
+def get_my_version():
+    with open(os.path.join(os.path.dirname(__file__), '../../pyproject.toml')) as fp:
+        for line in fp:
+            if line.startswith('version'):
+                return 'Version' + line.split('=')[1]
+        else:
+            raise RuntimeError('Unable to find own __version__ string')
+
+
 def main():
-    if len(sys.argv) != 2:
-        sys.exit("Usage: {} <datasetname>".format(sys.argv[0]))
-    dataset_name = sys.argv[1]
+    parser = argparse.ArgumentParser(description='analyse space occupied by a ZFS filesystem.')
+    parser.add_argument('-V', '--version', action='version', version=get_my_version())
+    parser.add_argument('-f', '--filter', type=float,
+                        help='Threshold in range [0,1] to filter out all less significant parts on analysis.',
+                        default=0.632)
+    parser.add_argument('dataset_name', type=str, help='a ZFS dataset name for analysis.')
+
+    args = parser.parse_args()
+    if args.filter > 1 or args.filter < 0:
+        raise ValueError('The filter cannot be out of [0,1] range.')
+    global filter_level
+    filter_level = 1 - args.filter
 
     # Initializing ZFS helper class
     zb = None  # Fix warnings about possible usage before initialization
@@ -311,24 +336,27 @@ def main():
         exit()
 
     # Starting with dataset analysis
-    summary = zb.get_dataset_summary(dataset_name)
+    summary = zb.get_dataset_summary(args.dataset_name)
 
     # Printing user intro
-    print('Analyzing ' + term_format['WHITEBOLD'] + dataset_name + term_format['END'] + ' ZFS dataset. '
+    print('Analyzing ' + term_format['WHITEBOLD'] + args.dataset_name + term_format['END'] + ' ZFS dataset. '
           'Total used space is ' + term_format['CYAN'] + size2human(summary[1][1]) + term_format['END'] + '. '
           'It is divided in the following way:')
     dv = DivBar()
     dv.print_dict(summary[3:])
 
-    # Find the most important parts in summary. They should include at least (1 - 1/e) (63.2%) of total data
+    # Find the most important parts in summary according to filter level
     summary_sorted = sorted(summary[3:], key=lambda x: -x[1])
     part_count = 0
     for item in summary_sorted:
         part_count += item[1] / summary[2][1]  # Normalized sum
         try:
-            deep_analysis(zb, dataset_name, *item)  # Analyze each part individually
+            print('')
+            deep_analysis(zb, args.dataset_name, *item)  # Analyze each part individually
         except Exception as err:
             print(err)
             raise
-        if part_count >= 0.632:  # (1 - 1/e) threshold
+        if part_count >= filter_level:
             break
+
+main()
