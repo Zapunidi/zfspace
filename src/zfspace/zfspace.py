@@ -83,12 +83,17 @@ def print_in_line(string, str_length):
 
 class DivBar:
     """
-    An object to draw console visual representations of different parts of a whole
+    An object to draw console visual representations of parts as bars forming a whole
     """
     def __init__(self):
         self.term_columns, self.term_lines = os.get_terminal_size()
 
     def print_dict(self, names_list):
+        """ Print a bar in terminal divided into segments. It helps to visualize the differences in sizes.
+
+        :param names_list: a list of tuples consisting of a name of a segment and its integer size
+        :return: None
+        """
         names, sizes = zip(*names_list)
         start, end = split_terminal_line(self.term_columns, fractions_list=sizes)
         for i, name in enumerate(names):
@@ -177,12 +182,11 @@ class ZfsBridge:
         command = '{} list -p -o space {}'.format(self.zfs_path, dataset_name)
         stream = os.popen(command)
         string_list = stream.read().split('\n')[0:2]  # Get names and data strings
-        # Split it by spaces and remove empty strings. Also drop name, Available and USED starting fields.
-        data = list(filter(None, string_list[1].split(' ')))[3:]
-        names = list(filter(None, string_list[0].split(' ')))[3:]
+        # Split it by spaces and remove empty strings and drop name.
+        data = list(filter(None, string_list[1].split(' ')))[1:]
+        names = list(filter(None, string_list[0].split(' ')))[1:]
         data = list(map(int, data))  # Convert to integers
-        dv = DivBar()
-        dv.print_dict(list(zip(names, data)))
+        return list(zip(names, data))
 
 
 class SnapshotSpace:
@@ -221,22 +225,59 @@ class SnapshotSpace:
         print('|')  # New line afterwards
 
 
+def deep_analysis(zb: ZfsBridge, dataset_name, name, _):
+    if name == 'USEDSNAP':
+        ss = None  # Fix warnings about possible usage before initialization
+        try:
+            ss = SnapshotSpace(dataset_name)
+        except Exception as err:
+            print(err)
+            exit()
+
+        ss.print_used()
+
+    elif name == 'USEDDS':
+        print('You have too much files in dataset. Delete some files.')
+
+    elif name == 'USEDREFRESERV':
+        print('Reduce refreserved option of the zfs filesystem.')
+
+    elif name == 'USEDCHILD':
+        print('Filesystem children are a problem.')
+
+    else:
+        raise Exception('Unknown ZFS {} space user: {}'.format(dataset_name, name))
+
+
 def main():
     if len(sys.argv) != 2:
         sys.exit("Usage: {} <datasetname>".format(sys.argv[0]))
     dataset_name = sys.argv[1]
 
-    # Preparing classes
-    ss = None  # Fix warnings about possible usage before initialization
+    # Initializing ZFS helper class
     zb = None  # Fix warnings about possible usage before initialization
     try:
-        ss = SnapshotSpace(dataset_name)
         zb = ZfsBridge()
     except Exception as err:
         print(err)
         exit()
 
+    # Starting with dataset analysis
+    summary = zb.get_dataset_summary(dataset_name)
+
     # Printing user intro
-    print('Analyzing ' + term_format['WHITEBOLD'] + dataset_name + term_format['END'] + ' ZFS dataset.')
-    zb.get_dataset_summary(dataset_name)
-    ss.print_used()
+    print('Analyzing ' + term_format['WHITEBOLD'] + dataset_name + term_format['END'] + ' ZFS dataset. '
+          'Total used space is ' + term_format['CYAN'] + size2human(summary[1][1]) + term_format['END'] + '. '
+          'It is divided in the following way:')
+    dv = DivBar()
+    dv.print_dict(summary[2:])
+
+    # Find the most important parts in summary. They should include at least (1 - 1/e) (63.2%) of total data
+    summary_sorted = sorted(summary[2:], key=lambda x: -x[1])
+    part_count = 0
+    for item in summary_sorted:
+        part_count += item[1] / summary[1][1]  # Normalized sum
+        if part_count >= 0.632:  # (1 - 1/e) threshold
+            break
+        else:
+            deep_analysis(zb, dataset_name, *item)  # Analyze each part individually
