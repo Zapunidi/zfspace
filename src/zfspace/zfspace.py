@@ -324,7 +324,7 @@ def main():
     summary_sorted = sorted(summary[3:], key=lambda x: -x[1])
     part_count = 0
     for item in summary_sorted:
-        part_count += item[1] / summary[1][1]  # Normalized sum
+        part_count += item[1] / summary[2][1]  # Normalized sum
         try:
             deep_analysis(zb, dataset_name, *item)  # Analyze each part individually
         except Exception as err:
