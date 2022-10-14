@@ -144,6 +144,20 @@ class ZfsBridge:
                 suggest_str = ''
             raise ValueError('There is no dataset "{}" in the system.{}'.format(dataset_name, suggest_str))
 
+    def get_filesystem_mountpoint(self, dataset_name):
+        self._check_dataset_name(dataset_name)
+        command = '{} get -Hp mountpoint {}'.format(self.zfs_path, dataset_name)
+        stream = os.popen(command)
+        output = stream.read().split('\t')[2]
+        return output
+
+    def get_filesystem_refreservation(self, dataset_name):
+        self._check_dataset_name(dataset_name)
+        command = '{} get -Hp refreservation {}'.format(self.zfs_path, dataset_name)
+        stream = os.popen(command)
+        output = stream.read().split('\t')[2]
+        return int(output)
+
     def get_snapshot_names(self, dataset_name):
         self._check_dataset_name(dataset_name)
         command = '{} list -H -d 1 -t snapshot -s creation -o name {}'.format(self.zfs_path, dataset_name)
@@ -230,28 +244,33 @@ class SnapshotSpace:
         print('|')  # New line afterwards
 
 
-def deep_analysis(zb: ZfsBridge, dataset_name, name, _):
-    if name == 'USEDSNAP':
-        ss = None  # Fix warnings about possible usage before initialization
-        try:
-            ss = SnapshotSpace(dataset_name)
-        except Exception as err:
-            print(err)
-            exit()
+def deep_analysis(zb: ZfsBridge, dataset_name, name, size):
+    def hello_helper(section_name, size_bytes, text):
+        print(term_format['WHITEBOLD'] + section_name + term_format['END'] + ' occupy ' + term_format['CYAN'] +
+              size2human(size_bytes) + term_format['END'] + '. ' + text)
 
+    if name == 'USEDSNAP':
+        hello_helper('Snapshots', size, 'This space consists of data unique for individual snapshots and data stored in'
+                     ' snapshots combinations. Therefore we will use pyramid representation:')
+        ss = SnapshotSpace(dataset_name)
         ss.print_used()
+        print('Recommendation to remove the following snapshots: TODO')
 
     elif name == 'USEDDS':
-        print('You have too much files in dataset. Delete some files.')
+        hello_helper('Files in {}'.format(zb.get_filesystem_mountpoint(dataset_name)), size,
+                     'Recommendation to delete files: TODO')
 
     elif name == 'USEDREFRESERV':
-        print('Reduce refreserved option of the zfs filesystem.')
+        hello_helper('Refreservation option', size,
+                     'Current refreservation value is {}. '.format(
+                         size2human(zb.get_filesystem_refreservation(dataset_name))
+                     ) + 'Remove it with "{} set refreservation=0 {}".'.format(zb.zfs_path, dataset_name))
 
     elif name == 'USEDCHILD':
-        print('Filesystem children are a problem.')
+        hello_helper('Children ZFS filesystems', size, 'The following children may be considered to be cleaned: TODO')
 
     else:
-        raise Exception('Unknown ZFS {} space user: {}'.format(dataset_name, name))
+        raise ValueError('Unknown ZFS {} space user: {}'.format(dataset_name, name))
 
 
 def main():
@@ -282,7 +301,10 @@ def main():
     part_count = 0
     for item in summary_sorted:
         part_count += item[1] / summary[1][1]  # Normalized sum
+        try:
+            deep_analysis(zb, dataset_name, *item)  # Analyze each part individually
+        except Exception as err:
+            print(err)
+            exit()
         if part_count >= 0.632:  # (1 - 1/e) threshold
             break
-        else:
-            deep_analysis(zb, dataset_name, *item)  # Analyze each part individually
