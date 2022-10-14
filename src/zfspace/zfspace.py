@@ -289,7 +289,7 @@ def deep_analysis(zb: ZfsBridge, dataset_name, name, size):
             print(term_format['BOLD'] + str(child[0][1]) + term_format['END'] +
                   term_format['CYAN'] + ' {}'.format(size2human(child[2][1]) + term_format['END'] + ' of ' +
                   term_format['CYAN'] + '{}'.format(size2human(used_all_children)) + term_format['END'] +
-                  ' {:.3}%.'.format(round(100 * child[2][1] / used_all_children, 1)) +
+                  ' ({:.3}%). '.format(round(100 * child[2][1] / used_all_children, 1)) +
                   'Run "zfspace {}" to make a more detailed analysis:'.format(child[0][1])))
             dv.print_dict(child[3:])
 
