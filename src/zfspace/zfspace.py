@@ -32,10 +32,15 @@ def size2human(size_bytes: int):
     if size_bytes == 0:
         return "0 B"
     size_name = ("B", "kiB", "MiB", "GiB", "TiB", "PiB", "EiB", "ZiB", "YiB")
-    i = int(math.floor(math.log(size_bytes, 1024)))
-    p = math.pow(1024, i)
-    s = round(size_bytes / p, 2)
-    return '{:.4} {}'.format(s, size_name[i])
+    order = int(math.floor(math.log(size_bytes, 1024)))
+    p = math.pow(1024, order)
+    digits = int(math.floor(math.log(size_bytes / p, 10)))  # Calculate meaningful digits to keep length in 4 characters
+    if digits > 1:  # Only integer output is suitable for values over 100.
+        s = int(round(size_bytes / p))
+        return '{} {}'.format(s, size_name[order])
+    else:  # Limit accuracy to 1 or 2 fractional decimals to get representations 1.23 and 12.3 and not 12.34
+        s = round(size_bytes / p, 2 - digits)
+        return '{:.4} {}'.format(s, size_name[order])
 
 
 def split_terminal_line(term_columns, slices=0, fractions_list=list(), padding=0):
