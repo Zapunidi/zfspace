@@ -158,6 +158,21 @@ class ZfsBridge:
         output = stream.read().split('\t')[2]
         return int(output)
 
+    def get_children_summary(self, dataset_name):
+        self._check_dataset_name(dataset_name)
+        command = '{} list -d 1 -p -S used -o space {}'.format(self.zfs_path, dataset_name)
+        stream = os.popen(command)
+        output = stream.read().split('\n')[:-1]  # Get all lines except the last one, that is empty
+        names = list(filter(None, output[0].split(' ')))
+        children = list()
+        for child in output[1:]:
+            item = list(filter(None, child.split(' ')))
+            if item[0] == dataset_name:  # Filter out the parent
+                continue
+            data = [item[0]] + list(map(int, item[1:]))  # Convert to integers all but name of the dataset
+            children.append(list(zip(names, data)))
+        return children
+
     def get_snapshot_names(self, dataset_name):
         self._check_dataset_name(dataset_name)
         command = '{} list -H -d 1 -t snapshot -s creation -o name {}'.format(self.zfs_path, dataset_name)
@@ -201,10 +216,10 @@ class ZfsBridge:
         command = '{} list -p -o space {}'.format(self.zfs_path, dataset_name)
         stream = os.popen(command)
         string_list = stream.read().split('\n')[0:2]  # Get names and data strings
-        # Split it by spaces and remove empty strings and drop name.
-        data = list(filter(None, string_list[1].split(' ')))[1:]
-        names = list(filter(None, string_list[0].split(' ')))[1:]
-        data = list(map(int, data))  # Convert to integers
+        # Split it by spaces and remove empty strings.
+        data = list(filter(None, string_list[1].split(' ')))
+        names = list(filter(None, string_list[0].split(' ')))
+        data = [data[0]] + list(map(int, data[1:]))  # Convert to integers all but name
         return list(zip(names, data))
 
 
@@ -267,7 +282,14 @@ def deep_analysis(zb: ZfsBridge, dataset_name, name, size):
                      ) + 'Remove it with "{} set refreservation=0 {}".'.format(zb.zfs_path, dataset_name))
 
     elif name == 'USEDCHILD':
-        hello_helper('Children ZFS filesystems', size, 'The following children may be considered to be cleaned: TODO')
+        hello_helper('Children ZFS filesystems', size, 'The following children may be considered to be cleaned:')
+        dv = DivBar()
+        used_all_children = zb.get_dataset_summary(dataset_name)[6][1]
+        for child in zb.get_children_summary(dataset_name):
+            print(term_format['BOLD'] + child[0][1] + term_format['END'] +
+                  ' {:.3}% '.format(round(100 * child[2][1] / used_all_children, 1)) +
+                  '(run zfspace {} to make a more detailed analisys) :'.format(child[0][1]))
+            dv.print_dict(child[3:])
 
     else:
         raise ValueError('Unknown ZFS {} space user: {}'.format(dataset_name, name))
@@ -294,10 +316,10 @@ def main():
           'Total used space is ' + term_format['CYAN'] + size2human(summary[1][1]) + term_format['END'] + '. '
           'It is divided in the following way:')
     dv = DivBar()
-    dv.print_dict(summary[2:])
+    dv.print_dict(summary[3:])
 
     # Find the most important parts in summary. They should include at least (1 - 1/e) (63.2%) of total data
-    summary_sorted = sorted(summary[2:], key=lambda x: -x[1])
+    summary_sorted = sorted(summary[3:], key=lambda x: -x[1])
     part_count = 0
     for item in summary_sorted:
         part_count += item[1] / summary[1][1]  # Normalized sum
@@ -305,6 +327,8 @@ def main():
             deep_analysis(zb, dataset_name, *item)  # Analyze each part individually
         except Exception as err:
             print(err)
-            exit()
+            raise
         if part_count >= 0.632:  # (1 - 1/e) threshold
             break
+
+main()
