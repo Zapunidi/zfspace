@@ -11,11 +11,13 @@ explanatory for inexperienced users.
 """
 
 import os
-import sys
 import math
 import difflib
 import argparse
 
+# Version is updated with bump2version helper. Do not update manually or you will lose sync
+__version__ = "0.4.2"
+filter_level = 0.368  # This value will be overwritten by default argparse filter value
 
 term_format = dict(PURPLE='\033[95m', CYAN='\033[96m', DARKCYAN='\033[36m', BLUE='\033[94m',
                    GREEN='\033[92m', YELLOW='\033[93m', RED='\033[91m', BOLD='\033[1m',
@@ -140,7 +142,9 @@ class ZfsBridge:
         if dataset_name not in self.zfs_datasets:
             candidate_list = difflib.get_close_matches(dataset_name, self.zfs_datasets, n=1)
             if len(candidate_list) == 1:
-                suggest_str = '\nDid you mean using "{}" instead?'.format(candidate_list[0])
+                suggest_str = '\nDid you mean using ' + \
+                              term_format['WHITEBOLD'] + '"{}"'.format(candidate_list[0]) + term_format['END'] + \
+                              ' instead?'
             else:
                 suggest_str = ''
             raise ValueError('There is no dataset "{}" in the system.{}'.format(dataset_name, suggest_str))
@@ -304,18 +308,9 @@ def deep_analysis(zb: ZfsBridge, dataset_name, name, size):
         raise ValueError('Unknown ZFS {} space user: {}'.format(dataset_name, name))
 
 
-def get_my_version():
-    with open(os.path.join(os.path.dirname(__file__), '../../pyproject.toml')) as fp:
-        for line in fp:
-            if line.startswith('version'):
-                return 'Version' + line.split('=')[1]
-        else:
-            raise RuntimeError('Unable to find own __version__ string')
-
-
 def main():
     parser = argparse.ArgumentParser(description='analyse space occupied by a ZFS filesystem.')
-    parser.add_argument('-V', '--version', action='version', version=get_my_version())
+    parser.add_argument('-V', '--version', action='version', version=__version__)
     parser.add_argument('-f', '--filter', type=float,
                         help='Threshold in range [0,1] to filter out all less significant parts on analysis.',
                         default=0.632)
