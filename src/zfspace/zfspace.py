@@ -16,7 +16,7 @@ import difflib
 import argparse
 
 # Version is updated with bump2version helper. Do not update manually or you will lose sync
-__version__ = "0.5.1"
+__version__ = '0.5.2'
 filter_level = 0.368  # This value will be overwritten by default argparse filter value
 
 term_format = dict(PURPLE='\033[95m', CYAN='\033[96m', DARKCYAN='\033[36m', BLUE='\033[94m',
@@ -33,8 +33,8 @@ def size2human(size_bytes: int):
     :rtype: str
     """
     if size_bytes == 0:
-        return "0 B"
-    size_name = ("B", "kiB", "MiB", "GiB", "TiB", "PiB", "EiB", "ZiB", "YiB")
+        return '0 B'
+    size_name = ('B', 'kiB', 'MiB', 'GiB', 'TiB', 'PiB', 'EiB', 'ZiB', 'YiB')
     order = int(math.floor(math.log(size_bytes, 1024)))
     p = math.pow(1024, order)
     digits = int(math.floor(math.log(size_bytes / p, 10)))  # Calculate meaningful digits to keep length in 4 characters
@@ -49,7 +49,7 @@ def size2human(size_bytes: int):
 def split_terminal_line(term_columns, slices=0, fractions_list=list(), padding=0):
     # Convert slices into fractions_list
     if len(fractions_list) == 0:
-        if slices is 0:
+        if slices == 0:
             raise TypeError('At least one parameter must be set. '
                             'Either slices > 0 or fractions_list must be a not empty list.')
         else:
@@ -301,7 +301,7 @@ def deep_analysis(zb: ZfsBridge, dataset_name, name, size):
                   ' ({:.3}%). '.format(round(100 * child[2][1] / used_all_children, 1)) +
                   'Run "zfspace {}" to make a more detailed analysis:'.format(child[0][1])))
             dv.print_dict(child[3:])
-            if part_count >= filter_level:
+            if part_count > filter_level:
                 break
 
     else:
@@ -335,7 +335,7 @@ def main():
 
     # Printing user intro
     print('Analyzing ' + term_format['WHITEBOLD'] + args.dataset_name + term_format['END'] + ' ZFS dataset. '
-          'Total used space is ' + term_format['CYAN'] + size2human(summary[1][1]) + term_format['END'] + '. '
+          'Total used space is ' + term_format['CYAN'] + size2human(summary[2][1]) + term_format['END'] + '. '
           'It is divided in the following way:')
     dv = DivBar()
     dv.print_dict(summary[3:])
@@ -351,5 +351,5 @@ def main():
         except Exception as err:
             print(err)
             raise
-        if part_count >= filter_level:
+        if part_count > filter_level:
             break
