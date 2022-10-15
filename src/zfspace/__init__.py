@@ -1,4 +1,4 @@
-from .zfspace import main
+from .zfspace import main  # noqa
 
 # Version is updated with bump2version helper. Do not update manually or you will lose sync
-__version__ = "0.4.2"
+__version__ = '0.5.1'

@@ -1,0 +1,9 @@
+[flake8]
+disable-noqa=False
+exclude = .git,.hg,__pycache__,venv, iv_compare.py
+max-complexity = 14
+inline-quotes = single
+multiline-quotes = """ 
+builtins = _
+verbose = 2
+max-line-length = 120
