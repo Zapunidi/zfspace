@@ -353,5 +353,3 @@ def main():
             raise
         if part_count >= filter_level:
             break
-
-main()
