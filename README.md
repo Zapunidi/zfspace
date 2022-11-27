@@ -52,5 +52,21 @@ pip3 install build
 ```
 To build a packet use bump2version first and then go into project directory and run:
  ```bash
- python3 -m build --wheel
+python3 -m build --wheel
  ```
+Install manually (replace x.x.x with correct version) with:
+```bash
+pip install dist/zfspace-x.x.x-py3-none-any.whl --force-reinstall
+```
+
+## Publishing notes
+
+Twine packet must be installed
+```bash
+pip3 install twine
+```
+To publish:
+```bash
+twine upload dist/zfspace-x.x.x-py3-none-any.whl
+```
+You will be asked for login and password on PyPi.
