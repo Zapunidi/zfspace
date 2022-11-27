@@ -3,6 +3,7 @@ name: Linter
 on:
   push:
     branches:
+      - master
       - main
       - 'dev-**'
 
