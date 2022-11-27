@@ -14,6 +14,7 @@ import os
 import math
 import difflib
 import argparse
+import copy
 
 # Version is updated with bump2version helper. Do not update manually or you will lose sync
 __version__ = '0.5.2'
@@ -24,26 +25,36 @@ term_format = dict(PURPLE='\033[95m', CYAN='\033[96m', DARKCYAN='\033[36m', BLUE
                    UNDERLINE='\033[4m', WHITEBOLD='\033[1;37m', END='\033[0m')
 
 
-def size2human(size_bytes: int):
+def size2human(size_bytes: int, format='full'):
     """Convert size in bytes into human readable format like MiB or GiB.
     Sizes up to YiB (>10^24) are supported. The result is rounded to 2-4 meaningful digits.
 
     :param int size_bytes: The bytes number that needs to be put into human readable form
-    :return: Short string representing size (14.1 GiB for example)
+    :param str format: Output format specifier. Default value 'full'.
+        Human readable form with several digits, and spaces is 'full'.
+        Computer and human readable form with no fractional part, no space, and one letter size is 'short'.
+    :return: String representing size (14.1 GiB for full format)
     :rtype: str
     """
+    if format not in ['full', 'short']:
+        raise ValueError('Unknown format {}.'.format(format))
     if size_bytes == 0:
         return '0 B'
     size_name = ('B', 'kiB', 'MiB', 'GiB', 'TiB', 'PiB', 'EiB', 'ZiB', 'YiB')
+    short_size_name = ('B', 'k', 'M', 'G', 'T', 'P', 'E', 'Z', 'Y')
     order = int(math.floor(math.log(size_bytes, 1024)))
     p = math.pow(1024, order)
     digits = int(math.floor(math.log(size_bytes / p, 10)))  # Calculate meaningful digits to keep length in 4 characters
-    if digits > 1:  # Only integer output is suitable for values over 100.
+    if format == 'short':
         s = int(round(size_bytes / p))
-        return '{} {}'.format(s, size_name[order])
-    else:  # Limit accuracy to 1 or 2 fractional decimals to get representations 1.23 and 12.3 and not 12.34
-        s = round(size_bytes / p, 2 - digits)
-        return '{:.4} {}'.format(s, size_name[order])
+        return '{}{}'.format(s, short_size_name[order])
+    elif format == 'full':
+        if digits > 1:  # Only integer output is suitable for values over 100.
+            s = int(round(size_bytes / p))
+            return '{} {}'.format(s, size_name[order])
+        else:  # Limit accuracy to 1 or 2 fractional decimals to get representations 1.23 and 12.3 and not 12.34
+            s = round(size_bytes / p, 2 - digits)
+            return '{:.4} {}'.format(s, size_name[order])
 
 
 def split_terminal_line(term_columns, slices=0, fractions_list=list(), padding=0):
@@ -73,20 +84,26 @@ def split_terminal_line(term_columns, slices=0, fractions_list=list(), padding=0
     return start_pos, end_pos
 
 
-def print_in_line(string, str_length):
+def print_in_line(string, str_length, emphasis=None):
     """Prints centered output, considering that console cursor is in the beginning of the span to print.
     Prints . or nothing if there is not enough space to print wrole string
 
     :param string: String to print
     :param int str_length: Integer number of symbols to fill with string
+    :param string emphasis: Make terminal text highlighted, colored, bold or whatever, based on term_format dict
     :return: None
     """
+    if emphasis is not None and emphasis not in term_format:
+        raise ValueError('Incorrect emphasis passed to print_in_line.')
     if len(string) > str_length:
         string = '.' * str_length
     if str_length == 0:
         return
     len_format = '{:^' + '{:d}'.format(str_length) + 's}'  # Prepare format string with desired width
-    print(len_format.format(string), end='')
+    if emphasis is None:
+        print(len_format.format(string), end='')
+    else:
+        print(term_format[emphasis] + len_format.format(string) + term_format['END'], end='')
 
 
 class DivBar:
@@ -202,7 +219,10 @@ class ZfsBridge:
         # While this might be useful to make a decision, this does not show used space hierarchy
         # Let's calculate the space occupied by snapshots combination and not by its subsets
 
-        # Now define a helper function for triange substraction
+        # Save this matrix because it is also good for analysis
+        would_free_matrix = copy.deepcopy(used_matrix)
+
+        # Now define a helper function for triangle substraction
         def substract_children(matrix, startx, starty):
             for x in range(startx):
                 for y in range(starty, starty + startx - x + 1):
@@ -214,7 +234,7 @@ class ZfsBridge:
                 if j < len(snapshot_list) - i:
                     substract_children(used_matrix, i, j)
         # Now we can get the whole snapshots occupied space by summing every matrix cell
-        return used_matrix
+        return used_matrix, would_free_matrix
 
     def get_dataset_summary(self, dataset_name):
         self._check_dataset_name(dataset_name)
@@ -238,21 +258,40 @@ class SnapshotSpace:
         if len(self.snapshot_names) >= self.zfs_max_snapshots:
             raise ValueError('You have more than {} snapshots in {}. It is too many to show in console.'
                              .format(len(self.snapshot_names), dataset_name))
-        self.snapshot_size_matrix = self.zb.get_snapshots_space(dataset_name, self.snapshot_names)
+        self.snapshot_size_matrix, self.would_free_matrix = \
+            self.zb.get_snapshots_space(dataset_name, self.snapshot_names)
 
-    def print_used(self):
+    def _highlight_matrix(self, highlight_level):
+        # Initialize return matrix with False values
+        ret = [[False for _ in range(len(self.snapshot_size_matrix[0]))] for _ in range(len(self.snapshot_size_matrix))]
+        # Now get total size from would_free_matrix top element
+        for i, row in enumerate(ret):
+            for j, _ in enumerate(row):
+                ret[i][j] = True
+        return ret
+
+    def print_used(self, highlight: float):
+        """
+        Prints the pyramid of snapshots space occupied. Snapshots names are at the bottom. Sizes are on top.
+        They are divided with vertical lines, showing some span, the size corresponds to.
+        Each size tells how much space is wasted in a combination, substracting space wasted in its any component.
+        :param float highlight: Biggest sizes that add up to the highlight fraction of total size
+            will be highlighted.
+        :return:
+        """
+        hl = self._highlight_matrix(highlight)
         for i in reversed(range(1, len(self.snapshot_names))):
-            self._print_line(self.snapshot_size_matrix[i][:-i])
-        self._print_line(self.snapshot_size_matrix[0])  # Last line falls out of general rule
+            self._print_line(self.snapshot_size_matrix[i][:-i], hl[i][:-i])
+        self._print_line(self.snapshot_size_matrix[0], hl[0])  # Last line falls out of general rule
         self._print_names()
 
-    def _print_line(self, sizes):
+    def _print_line(self, sizes, highlight):
         max_split = len(self.snapshot_names)
         start, end = split_terminal_line(self.term_columns, slices=len(sizes),
                                          padding=int((max_split - len(sizes)) * self.term_columns / max_split / 2))
         print(' ' * (start[0] - 1) + '|', end='')  # shifting for padding
         for i, size in enumerate(sizes):
-            print_in_line(size2human(size), end[i] - start[i])
+            print_in_line(size2human(size), end[i] - start[i], emphasis='CYAN' if highlight[i] else None)
             print('|', end='')
         print('')  # New line afterwards
 
@@ -275,18 +314,26 @@ def deep_analysis(zb: ZfsBridge, dataset_name, name, size):
         hello_helper('Snapshots', size, 'This space consists of data unique for individual snapshots and data stored in'
                      ' snapshots combinations. Therefore we will use pyramid representation:')
         ss = SnapshotSpace(dataset_name)
-        ss.print_used()
+        ss.print_used(filter_level)
         print('Recommendation to remove the following snapshots: TODO')
 
     elif name == 'USEDDS':
         hello_helper('Files in {}'.format(zb.get_filesystem_mountpoint(dataset_name)), size,
-                     'Recommendation to delete files: TODO')
+                     f"""Run "du -xsh {zb.get_filesystem_mountpoint(dataset_name)}/*" preferrably by root user. \
+This will calculate the occupied space for each file and subfolder in your ZFS filesystem, \
+excluding other filesystem mounts like network mounts and ZFS children filesystems.
+It will not exclude folders with mountpoints right in the {zb.get_filesystem_mountpoint(dataset_name)}. \
+You will have to exclude them separately with du --exclude option. \
+Running as a regular user will skip some directories with "Permission denied" error.""")
 
     elif name == 'USEDREFRESERV':
+        refres = zb.get_filesystem_refreservation(dataset_name)
         hello_helper('Refreservation option', size,
-                     'Current refreservation value is {}. '.format(
-                         size2human(zb.get_filesystem_refreservation(dataset_name))
-                     ) + 'Remove it with "{} set refreservation=0 {}".'.format(zb.zfs_path, dataset_name))
+                     'Current refreservation value is {}. '.format(size2human(refres)) +
+                     'Limit it to the current requirement with "{} set refreservation={} {}".'.format(
+                         zb.zfs_path, size2human(refres - size, format='short'), dataset_name
+                     )
+                     )
 
     elif name == 'USEDCHILD':
         hello_helper('Children ZFS filesystems', size, 'The following children may be considered to be cleaned:')
