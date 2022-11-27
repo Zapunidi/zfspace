@@ -106,6 +106,37 @@ def print_in_line(string, str_length, emphasis=None):
         print(term_format[emphasis] + len_format.format(string) + term_format['END'], end='')
 
 
+def shorten_names(names_list):
+    # Basic sane check
+    if len(names_list) <= 1:
+        return names_list
+
+    # Find candidates for removal by first two names
+    match = difflib.SequenceMatcher(None, names_list[0], names_list[1])
+    # We save size with sequences longer than '...'
+    ops = list(filter(lambda element: element[2] - element[1] >= 3, match.get_opcodes()))
+    candidates = [names_list[0][c[1]:c[2]] for c in sorted(ops, key=lambda x: x[2] - x[1], reverse=True)]
+
+    # Run through all candidates
+    winner = ''
+    for cnd in candidates:
+        all_contain = True  # Let's suppose all names contain the candidate
+        for name in names_list[2:]:
+            if cnd not in name:
+                all_contain = False  # Alas this name doesn't contain the candidate
+                break
+        if all_contain:  # We have a winner
+            winner = cnd  # Store the winner
+            break  # No need to continue
+    ret = []
+    if winner != '':
+        for name in names_list:
+            ret.append(name.replace(winner, '...'))
+        return ret
+    else:
+        return names_list
+
+
 class DivBar:
     """
     An object to draw console visual representations of parts as bars forming a whole
@@ -318,7 +349,7 @@ class SnapshotSpace:
 
     def _print_names(self):
         start, end = split_terminal_line(self.term_columns, slices=len(self.snapshot_names))
-        for i, name in enumerate(self.snapshot_names):
+        for i, name in enumerate(shorten_names(self.snapshot_names)):
             print('|', end='')
             print_in_line(name, end[i] - start[i])
         print('|')  # New line afterwards

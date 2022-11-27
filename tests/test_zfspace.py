@@ -1,6 +1,6 @@
 from unittest import TestCase
 import os
-from src.zfspace.zfspace import size2human
+from src.zfspace.zfspace import size2human, shorten_names
 
 
 os.chdir(os.path.dirname(__file__) + '/..')
@@ -9,7 +9,6 @@ os.chdir(os.path.dirname(__file__) + '/..')
 class TestZfspace(TestCase):
     def test_size2human(self):
         self.assertTrue(size2human(123) == '123 B')
-        # print(size2human(2_000_000_000_000_000_000_000))
         self.assertTrue(size2human(1_234) == '1.21 kiB')
         self.assertTrue(size2human(1_001) == '1001 B')
         self.assertTrue(size2human(1_002_000) == '979 kiB')
@@ -33,3 +32,10 @@ class TestZfspace(TestCase):
         self.assertTrue(size2human(2_000_000_000_000_000, fmt='short') == '2P')
         self.assertTrue(size2human(1_150_000_000_000_000_000, fmt='short') == '1021P')
         self.assertTrue(size2human(2_000_000_000_000_000_000_000, fmt='short') == '2Z')
+
+    def test_shorten_names(self):
+        names = ['zfs_1', 'zfs_2', 'zfs_backup']
+        shortn = shorten_names(names)
+        self.assertTrue(shortn[0] == '...1')
+        self.assertTrue(shortn[1] == '...2')
+        self.assertTrue(shortn[2] == '...backup')
