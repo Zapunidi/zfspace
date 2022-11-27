@@ -126,6 +126,9 @@ class DivBar:
             print_in_line(name + ' ' + size2human(sizes[i]), end[i] - start[i])
         print('|')  # New line afterwards
 
+    def print_hr(self):
+        print('-'*self.term_columns)
+
 
 class ZfsBridge:
     zfs_path = '/sbin/zfs'
@@ -402,10 +405,11 @@ def main():
     summary = zb.get_dataset_summary(args.dataset_name)
 
     # Printing user intro
+    dv = DivBar()
+    dv.print_hr()
     print('Analyzing ' + term_format['WHITEBOLD'] + args.dataset_name + term_format['END'] + ' ZFS dataset. '
           'Total used space is ' + term_format['CYAN'] + size2human(summary[2][1]) + term_format['END'] + '. '
           'It is divided in the following way:')
-    dv = DivBar()
     dv.print_dict(summary[3:])
 
     # Find the most important parts in summary according to filter level
@@ -414,7 +418,7 @@ def main():
     for item in summary_sorted:
         part_count += item[1] / summary[2][1]  # Normalized sum
         try:
-            print('')
+            dv.print_hr()
             deep_analysis(zb, args.dataset_name, *item)  # Analyze each part individually
         except Exception as err:
             print(err)
