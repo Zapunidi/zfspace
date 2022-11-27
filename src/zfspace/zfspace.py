@@ -318,11 +318,14 @@ def deep_analysis(zb: ZfsBridge, dataset_name, name, size):
         print('Recommendation to remove the following snapshots: TODO')
 
     elif name == 'USEDDS':
-        hello_helper('Files in {}'.format(zb.get_filesystem_mountpoint(dataset_name)), size,
-                     f"""Run "du -xsh {zb.get_filesystem_mountpoint(dataset_name)}/*" preferrably by root user. \
+        path = zb.get_filesystem_mountpoint(dataset_name)
+        if not path.endswith('/'):
+            path = path + '/'
+        hello_helper('Files in {}'.format(path), size,
+                     f"""Run "du -xsh {path}*" preferrably by root user. \
 This will calculate the occupied space for each file and subfolder in your ZFS filesystem, \
 excluding other filesystem mounts like network mounts and ZFS children filesystems.
-It will not exclude folders with mountpoints right in the {zb.get_filesystem_mountpoint(dataset_name)}. \
+It will not exclude folders with mountpoints right in the {path}. \
 You will have to exclude them separately with du --exclude option. \
 Running as a regular user will skip some directories with "Permission denied" error.""")
 
