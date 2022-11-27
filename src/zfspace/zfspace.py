@@ -25,19 +25,19 @@ term_format = dict(PURPLE='\033[95m', CYAN='\033[96m', DARKCYAN='\033[36m', BLUE
                    UNDERLINE='\033[4m', WHITEBOLD='\033[1;37m', END='\033[0m')
 
 
-def size2human(size_bytes: int, format='full'):
+def size2human(size_bytes: int, fmt='full'):
     """Convert size in bytes into human readable format like MiB or GiB.
     Sizes up to YiB (>10^24) are supported. The result is rounded to 2-4 meaningful digits.
 
     :param int size_bytes: The bytes number that needs to be put into human readable form
-    :param str format: Output format specifier. Default value 'full'.
+    :param str fmt: Output format specifier. Default value 'full'.
         Human readable form with several digits, and spaces is 'full'.
         Computer and human readable form with no fractional part, no space, and one letter size is 'short'.
     :return: String representing size (14.1 GiB for full format)
     :rtype: str
     """
-    if format not in ['full', 'short']:
-        raise ValueError('Unknown format {}.'.format(format))
+    if fmt not in ['full', 'short']:
+        raise ValueError('Unknown format {}.'.format(fmt))
     if size_bytes == 0:
         return '0 B'
     size_name = ('B', 'kiB', 'MiB', 'GiB', 'TiB', 'PiB', 'EiB', 'ZiB', 'YiB')
@@ -45,10 +45,10 @@ def size2human(size_bytes: int, format='full'):
     order = int(math.floor(math.log(size_bytes, 1024)))
     p = math.pow(1024, order)
     digits = int(math.floor(math.log(size_bytes / p, 10)))  # Calculate meaningful digits to keep length in 4 characters
-    if format == 'short':
+    if fmt == 'short':
         s = int(round(size_bytes / p))
         return '{}{}'.format(s, short_size_name[order])
-    elif format == 'full':
+    elif fmt == 'full':
         if digits > 1:  # Only integer output is suitable for values over 100.
             s = int(round(size_bytes / p))
             return '{} {}'.format(s, size_name[order])
@@ -334,7 +334,7 @@ Running as a regular user will skip some directories with "Permission denied" er
         hello_helper('Refreservation option', size,
                      'Current refreservation value is {}. '.format(size2human(refres)) +
                      'Limit it to the current requirement with "{} set refreservation={} {}".'.format(
-                         zb.zfs_path, size2human(refres - size, format='short'), dataset_name
+                         zb.zfs_path, size2human(refres - size, fmt='short'), dataset_name
                      )
                      )
 
