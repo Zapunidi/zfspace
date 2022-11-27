@@ -264,10 +264,28 @@ class SnapshotSpace:
     def _highlight_matrix(self, highlight_level):
         # Initialize return matrix with False values
         ret = [[False for _ in range(len(self.snapshot_size_matrix[0]))] for _ in range(len(self.snapshot_size_matrix))]
+
         # Now get total size from would_free_matrix top element
+        total_size = self.would_free_matrix[-1][0]
+
+        # Sort sizes to apply highlight_level
+        flatten_sizes = [j for sub in self.snapshot_size_matrix for j in sub]
+        flatten_sizes.sort(reverse=True)
+
+        # Calculate threshold
+        accumulator = 0  # Accumulate sum of sizes, until reach the desired fraction of total size
+        threshold = 0  # A variable for threshold
+        for s in flatten_sizes:
+            accumulator += s
+            if accumulator >= total_size * highlight_level:
+                threshold = s
+                break
+
+        # Fill the matrix, knowing size threshold
         for i, row in enumerate(ret):
             for j, _ in enumerate(row):
-                ret[i][j] = True
+                if self.snapshot_size_matrix[i][j] >= threshold:
+                    ret[i][j] = True
         return ret
 
     def print_used(self, highlight: float):
