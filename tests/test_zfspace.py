@@ -35,7 +35,7 @@ class TestZfspace(TestCase):
 
     def test_shorten_names(self):
         names = ['zfs_1', 'zfs_2', 'zfs_backup']
-        shortn = shorten_names(names)
-        self.assertTrue(shortn[0] == '...1')
+        shortn = shorten_names(names, [5, 4, 9])
+        self.assertTrue(shortn[0] == 'zfs_1')
         self.assertTrue(shortn[1] == '...2')
         self.assertTrue(shortn[2] == '...backup')
