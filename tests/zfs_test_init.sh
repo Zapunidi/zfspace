@@ -30,8 +30,8 @@ dd if=/dev/urandom of=temp/mnt/child1/file1 count=2 bs=1M
 dd if=/dev/urandom of=temp/mnt/child2/file1 count=2 bs=1M
 
 # Make assymetrical snapshots
-sudo /sbin/zfs snap zfspace_test@gen1
-sudo /sbin/zfs snap zfspace_test/child2@gen1
+sudo /sbin/zfs snap zfspace_test@generation1
+sudo /sbin/zfs snap zfspace_test/child2@generation1
 
 # GENERATION 2
 
@@ -41,8 +41,8 @@ dd if=/dev/urandom of=temp/mnt/child1/file2 count=1 bs=1M
 dd if=/dev/urandom of=temp/mnt/child2/file2 count=1 bs=1M
 
 # Make assymetrical snapshots
-sudo /sbin/zfs snap zfspace_test@gen2
-sudo /sbin/zfs snap zfspace_test/child1@gen2
+sudo /sbin/zfs snap zfspace_test@generation2
+sudo /sbin/zfs snap zfspace_test/child1@generation2
 
 # GENERATION 3
 
@@ -52,7 +52,7 @@ rm temp/mnt/child1/file1
 rm temp/mnt/child2/file2
 
 # Make full snapshots
-sudo /sbin/zfs snap -r zfspace_test@gen3
+sudo /sbin/zfs snap -r zfspace_test@generation_long_name_for_test3
 
 # GENERATION 4
 
@@ -75,8 +75,8 @@ rm temp/mnt/child1/file2
 rm temp/mnt/child2/file1
 
 # Make partial snapshots
-sudo /sbin/zfs snap zfspace_test@gen5
-sudo /sbin/zfs snap zfspace_test/child1@gen5
+sudo /sbin/zfs snap zfspace_test@generation5
+sudo /sbin/zfs snap zfspace_test/child1@generation5
 
 # GENERATION 6
 

@@ -106,7 +106,12 @@ def print_in_line(string, str_length, emphasis=None):
         print(term_format[emphasis] + len_format.format(string) + term_format['END'], end='')
 
 
-def shorten_names(names_list):
+def shorten_names(names_list, length_list):
+    """ Finds common part of the names to shorten it so that it will fit into corresponding length
+    :param names_list: A list of strings to shorten
+    :param length_list: A list of lengths for names to fit in
+    :return: List of shortened names
+    """
     # Basic sane check
     if len(names_list) <= 1:
         return names_list
@@ -130,8 +135,12 @@ def shorten_names(names_list):
             break  # No need to continue
     ret = []
     if winner != '':
-        for name in names_list:
-            ret.append(name.replace(winner, '...'))
+        for index, name in enumerate(names_list):
+            excess = len(name) - length_list[index]
+            if excess > 0:
+                ret.append(name.replace(winner[-(excess+3):], '...'))
+            else:
+                ret.append(name)
         return ret
     else:
         return names_list
@@ -349,9 +358,10 @@ class SnapshotSpace:
 
     def _print_names(self):
         start, end = split_terminal_line(self.term_columns, slices=len(self.snapshot_names))
-        for i, name in enumerate(shorten_names(self.snapshot_names)):
+        lengths = [end[i] - start[i] for i, _ in enumerate(start)]
+        for i, name in enumerate(shorten_names(self.snapshot_names, lengths)):
             print('|', end='')
-            print_in_line(name, end[i] - start[i])
+            print_in_line(name, lengths[i])
         print('|')  # New line afterwards
 
 
