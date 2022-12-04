@@ -298,6 +298,7 @@ class SnapshotSpace:
         self.term_columns, self.term_lines = os.get_terminal_size()
         self.zb = ZfsBridge()
         self.snapshot_names = self.zb.get_snapshot_names(dataset_name)
+        self.dataset_name = dataset_name
         if len(self.snapshot_names) >= self.zfs_max_snapshots:
             raise ValueError('You have more than {} snapshots in {}. It is too many to show in console.'
                              .format(len(self.snapshot_names), dataset_name))
@@ -331,21 +332,6 @@ class SnapshotSpace:
                     ret[i][j] = True
         return ret
 
-    def print_used(self, highlight: float):
-        """
-        Prints the pyramid of snapshots space occupied. Snapshots names are at the bottom. Sizes are on top.
-        They are divided with vertical lines, showing some span, the size corresponds to.
-        Each size tells how much space is wasted in a combination, substracting space wasted in its any component.
-        :param float highlight: Biggest sizes that add up to the highlight fraction of total size
-            will be highlighted.
-        :return:
-        """
-        hl = self._highlight_matrix(highlight)
-        for i in reversed(range(1, len(self.snapshot_names))):
-            self._print_line(self.snapshot_size_matrix[i][:-i], hl[i][:-i])
-        self._print_line(self.snapshot_size_matrix[0], hl[0])  # Last line falls out of general rule
-        self._print_names()
-
     def _print_line(self, sizes, highlight):
         max_split = len(self.snapshot_names)
         start, end = split_terminal_line(self.term_columns, slices=len(sizes),
@@ -364,6 +350,43 @@ class SnapshotSpace:
             print_in_line(name, lengths[i])
         print('|')  # New line afterwards
 
+    def print_used(self, highlight: float):
+        """
+        Prints the pyramid of snapshots space occupied. Snapshots names are at the bottom. Sizes are on top.
+        They are divided with vertical lines, showing some span, the size corresponds to.
+        Each size tells how much space is wasted in a combination, substracting space wasted in its any component.
+        :param float highlight: Biggest sizes that add up to the highlight fraction of total size
+            will be highlighted.
+        :return:
+        """
+        hl = self._highlight_matrix(highlight)
+        for i in reversed(range(1, len(self.snapshot_names))):
+            self._print_line(self.snapshot_size_matrix[i][:-i], hl[i][:-i])
+        self._print_line(self.snapshot_size_matrix[0], hl[0])  # Last line falls out of general rule
+        self._print_names()
+
+    def get_destroy_recommendations(self, recommendations=2):
+        # Normalize would free matrix to the number of snapshots to be removed
+        free_norm_matrix = [[elem/(index + 1) for elem in row] for index, row in enumerate(self.would_free_matrix)]
+
+        # Now sort the candidates in descending order
+        flatten_sizes = [j for sub in free_norm_matrix for j in sub]
+        flatten_sizes.sort(reverse=True)
+
+        # Find the threshold for normalize values to neglect if equal or less
+        threshold = flatten_sizes[recommendations]
+
+        # Build recommendations knowing the threshold
+        answer = ''
+        for i, row in enumerate(free_norm_matrix):
+            for j, _ in enumerate(row):
+                if free_norm_matrix[i][j] > threshold:
+                    answer += f'Removing {i+1} snapshot(s) will free {size2human(self.would_free_matrix[i][j])}. ' \
+                              f'Use "{self.zb.zfs_path} destroy ' \
+                              f'{self.dataset_name}@{self.snapshot_names[j]}%{self.snapshot_names[j+i]}"\n'
+
+        return answer
+
 
 def deep_analysis(zb: ZfsBridge, dataset_name, name, size):
     global filter_level
@@ -377,7 +400,7 @@ def deep_analysis(zb: ZfsBridge, dataset_name, name, size):
                      ' snapshots combinations. Therefore we will use pyramid representation:')
         ss = SnapshotSpace(dataset_name)
         ss.print_used(filter_level)
-        print('Recommendation to remove the following snapshots: TODO')
+        print(ss.get_destroy_recommendations(3))
 
     elif name == 'USEDDS':
         path = zb.get_filesystem_mountpoint(dataset_name)

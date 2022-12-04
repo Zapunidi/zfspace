@@ -36,7 +36,7 @@ sudo /sbin/zfs snap zfspace_test/child2@generation1
 # GENERATION 2
 
 # Populate with files
-dd if=/dev/urandom of=temp/mnt/par2 count=1 bs=1M
+dd if=/dev/urandom of=temp/mnt/par2 count=3 bs=512K
 dd if=/dev/urandom of=temp/mnt/child1/file2 count=1 bs=1M
 dd if=/dev/urandom of=temp/mnt/child2/file2 count=1 bs=1M
 
