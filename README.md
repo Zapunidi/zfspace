@@ -2,6 +2,7 @@
 Console tool to find occupied pool space in ZFS on Linux.
 The tool uses pure python3 with shell commands to collect useful information from ZFS 
 and show it in convenient way wit recommendations how to free some space.
+![An example of zfspace console output](./docs/zfspace_example.png)
 
 ## Introduction
 
