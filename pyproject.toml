@@ -6,7 +6,7 @@ version = "0.7.0"
 authors = [
     { name = "Sergey Zapunidi", email = "zapunidy@gmail.com" }
 ]
-requires-python = ">=3.4"
+requires-python = ">=3.6"
 classifiers = [
     "Topic :: System :: Filesystems",
     "Programming Language :: Python :: 3",
