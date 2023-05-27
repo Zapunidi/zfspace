@@ -57,8 +57,10 @@ def size2human(size_bytes: int, fmt='full'):
             return '{:.4} {}'.format(s, size_name[order])
 
 
-def split_terminal_line(term_columns, slices=0, fractions_list=list(), padding=0):
+def split_terminal_line(term_columns, slices=0, fractions_list=None, padding=0):
     # Convert slices into fractions_list
+    if fractions_list is None:
+        fractions_list = []
     if len(fractions_list) == 0:
         if slices == 0:
             raise TypeError('At least one parameter must be set. '
@@ -209,6 +211,16 @@ class ZfsBridge:
                 suggest_str = ''
             raise ValueError('There is no dataset "{}" in the system.{}'.format(dataset_name, suggest_str))
 
+    @staticmethod
+    def _zfs_output_convert(line: str):
+        """
+        Takes a line of ZFS output and convert it to a list with name and integer values
+        :param line: ZFS console output
+        :return: list starting with a string and followed by integers with data from input line
+        """
+        lst = list(filter(None, line.split(' ')))
+        return [lst[0], *list(map(int, lst[1:]))]  # Convert to integers all but name of the dataset
+
     def get_filesystem_mountpoint(self, dataset_name):
         self._check_dataset_name(dataset_name)
         command = '{} get -Hp mountpoint {}'.format(self.zfs_path, dataset_name)
@@ -231,10 +243,9 @@ class ZfsBridge:
         names = list(filter(None, output[0].split(' ')))
         children = list()
         for child in output[1:]:
-            item = list(filter(None, child.split(' ')))
-            if item[0] == dataset_name:  # Filter out the parent
+            data = self._zfs_output_convert(child)
+            if data[0] == dataset_name:  # Filter out the parent
                 continue
-            data = [item[0]] + list(map(int, item[1:]))  # Convert to integers all but name of the dataset
             children.append(list(zip(names, data)))
         return children
 
@@ -285,9 +296,8 @@ class ZfsBridge:
         stream = os.popen(command)
         string_list = stream.read().split('\n')[0:2]  # Get names and data strings
         # Split it by spaces and remove empty strings.
-        data = list(filter(None, string_list[1].split(' ')))
         names = list(filter(None, string_list[0].split(' ')))
-        data = [data[0]] + list(map(int, data[1:]))  # Convert to integers all but name
+        data = self._zfs_output_convert(string_list[1])
         return list(zip(names, data))
 
 
