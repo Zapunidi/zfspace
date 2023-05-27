@@ -19,7 +19,7 @@ jobs:
           python-version: "3.6"
       - name: Install pypa/build
         run: |
-            python3 -m pip install build --wheel
+            python3 -m pip install build --user
       - name: Build a dist
         run: |
             python3 -m build --wheel
