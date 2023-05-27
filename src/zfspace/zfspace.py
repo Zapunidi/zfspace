@@ -17,7 +17,7 @@ import argparse
 import copy
 
 # Version is updated with bump2version helper. Do not update manually or you will lose sync
-__version__ = '0.7.1'
+__version__ = '0.7.2'
 filter_level = 0.368  # This value will be overwritten by default argparse filter value
 
 term_format = dict(PURPLE='\033[95m', CYAN='\033[96m', DARKCYAN='\033[36m', BLUE='\033[94m',
