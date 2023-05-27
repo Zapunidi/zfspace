@@ -2,12 +2,8 @@ name: Publish Python 🐍 distributions 📦 to PyPI
 
 on:
   push:
-    # Branches filter work with tag fiter as a logical AND
-    branches:
-      - master
-      - main
     tags:
-      - 'v*.*.*'
+      - 'v[0-9]+.[0-9]+.[0-9]+'
 
 jobs:
   build-n-publish:
