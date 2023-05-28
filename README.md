@@ -21,7 +21,9 @@ to free some space. The snapshot analysis is similar to
 ## Installation
 
 `pip3 install zfspace`
-zfspace doesn't require root priviledges as it is installed in ~/.local/bin/ 
+zfspace doesn't require root priviledges as it is installed in ~/.local/bin/   
+If you install zfspace on a fresh server as a first python console tool, 
+you need to restart your session to load new user PATH updated by pip.  
 
 ## Usage
 
